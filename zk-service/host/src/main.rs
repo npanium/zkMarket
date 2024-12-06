@@ -16,6 +16,30 @@ fn check_range(value: i32, min: i32, max: i32) {
 
     let prover = default_prover();
     let receipt = prover.prove(env, RANGE_CHECKER_ELF).unwrap().receipt;
+
+    // Start-- zkVerify
+    let receipt_inner_bytes_array = bincode::serialize(&receipt.inner).unwrap();
+    println!(
+        "Serialized bytes array (hex) INNER: {:?}\n",
+        hex::encode(&receipt_inner_bytes_array)
+    );
+
+    let receipt_journal_bytes_array = bincode::serialize(&receipt.journal).unwrap();
+    println!(
+        "Serialized bytes array (hex) JOURNAL: {:?}\n",
+        hex::encode(&receipt_journal_bytes_array)
+    );
+
+    let mut image_id_hex = String::new();
+    for &value in &RANGE_CHECKER_ID {
+        image_id_hex.push_str(&format!("{:08x}", value.to_be()));
+    }
+    println!(
+        "Serialized bytes array (hex) IMAGE_ID: {:?}\n",
+        image_id_hex
+    );
+    // End-- zkVerify
+
     let result: bool = receipt.journal.decode().unwrap();
 
     println!(
