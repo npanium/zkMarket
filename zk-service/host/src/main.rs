@@ -1,78 +1,149 @@
+use actix_web::{web, App, HttpResponse, HttpServer, Responder};
 use methods::{RANGE_CHECKER_ELF, RANGE_CHECKER_ID};
 use risc0_zkvm::{default_prover, ExecutorEnv};
+use std::collections::HashMap;
+use tokio::sync::{mpsc, Mutex};
+use uuid::Uuid;
 
-fn check_range(value: i32, min: i32, max: i32) {
-    let env = ExecutorEnv::builder()
-        .write(&(0_i32))
-        .unwrap() // mode
-        .write(&value)
-        .unwrap()
-        .write(&min)
-        .unwrap()
-        .write(&max)
-        .unwrap()
-        .build()
-        .unwrap();
+mod models;
+use models::*;
 
-    let prover = default_prover();
-    let receipt = prover.prove(env, RANGE_CHECKER_ELF).unwrap().receipt;
+async fn generate_proof(input: ProofWorkerInput) -> ProofResponse {
+    match input {
+        ProofWorkerInput::Range(data) => {
+            let env = ExecutorEnv::builder()
+                .write(&(0_i32))
+                .unwrap()
+                .write(&data.value)
+                .unwrap()
+                .write(&data.min)
+                .unwrap()
+                .write(&data.max)
+                .unwrap()
+                .build()
+                .unwrap();
 
-    // Start-- zkVerify
-    let receipt_inner_bytes_array = bincode::serialize(&receipt.inner).unwrap();
-    println!(
-        "Serialized bytes array (hex) INNER: {:?}\n",
-        hex::encode(&receipt_inner_bytes_array)
-    );
+            let prover = default_prover();
+            let receipt = prover.prove(env, RANGE_CHECKER_ELF).unwrap().receipt;
 
-    let receipt_journal_bytes_array = bincode::serialize(&receipt.journal).unwrap();
-    println!(
-        "Serialized bytes array (hex) JOURNAL: {:?}\n",
-        hex::encode(&receipt_journal_bytes_array)
-    );
+            // Start-- zkVerify
 
-    let mut image_id_hex = String::new();
-    for &value in &RANGE_CHECKER_ID {
-        image_id_hex.push_str(&format!("{:08x}", value.to_be()));
+            // Proof
+            let inner_hex = hex::encode(bincode::serialize(&receipt.inner).unwrap());
+            // Public inputs
+            let journal_hex = hex::encode(bincode::serialize(&receipt.journal).unwrap());
+            // vk
+            let mut image_id_hex = String::new();
+            for &value in &RANGE_CHECKER_ID {
+                image_id_hex.push_str(&format!("{:08x}", value.to_be()));
+            }
+            // End-- zkVerify
+
+            let result: bool = receipt.journal.decode().unwrap();
+
+            ProofResponse {
+                result,
+                inner_hex,
+                journal_hex,
+                image_id_hex,
+            }
+        }
+        ProofWorkerInput::Funds(data) => {
+            let env = ExecutorEnv::builder()
+                .write(&(1_i32))
+                .unwrap() // mode
+                .write(&data.proposed_price)
+                .unwrap()
+                .write(&data.available_funds)
+                .unwrap()
+                .build()
+                .unwrap();
+
+            let prover = default_prover();
+            let receipt = prover.prove(env, RANGE_CHECKER_ELF).unwrap().receipt;
+
+            // Start-- zkVerify
+
+            // Proof
+            let inner_hex = hex::encode(bincode::serialize(&receipt.inner).unwrap());
+            // Public inputs
+            let journal_hex = hex::encode(bincode::serialize(&receipt.journal).unwrap());
+            // vk
+            let mut image_id_hex = String::new();
+            for &value in &RANGE_CHECKER_ID {
+                image_id_hex.push_str(&format!("{:08x}", value.to_be()));
+            }
+            // End-- zkVerify
+
+            let result: bool = receipt.journal.decode().unwrap();
+
+            ProofResponse {
+                result,
+                inner_hex,
+                journal_hex,
+                image_id_hex,
+            }
+        }
     }
-    println!(
-        "Serialized bytes array (hex) IMAGE_ID: {:?}\n",
-        image_id_hex
-    );
-    // End-- zkVerify
-
-    let result: bool = receipt.journal.decode().unwrap();
-
-    println!(
-        "Value {} is within range [{}, {}]: {}",
-        value, min, max, result
-    );
 }
 
-fn check_sufficient_funds(proposed_price: i32, available_funds: i32) {
-    let env = ExecutorEnv::builder()
-        .write(&(1_i32))
-        .unwrap() // mode
-        .write(&proposed_price)
-        .unwrap()
-        .write(&available_funds)
-        .unwrap()
-        .build()
+async fn check_range(data: web::Json<RangeCheck>, state: web::Data<AppState>) -> impl Responder {
+    let job_id = Uuid::new_v4().to_string();
+
+    state.jobs.lock().await.insert(
+        job_id.clone(),
+        JobStatus {
+            status: "processing".to_string(),
+            proof: None,
+        },
+    );
+
+    state
+        .tx
+        .send((job_id.clone(), ProofWorkerInput::Range(data.0)))
+        .await
         .unwrap();
 
-    let prover = default_prover();
-    let receipt = prover.prove(env, RANGE_CHECKER_ELF).unwrap().receipt;
-    let result: bool = receipt.journal.decode().unwrap();
-
-    println!(
-        "Buyer has sufficient funds ({}) for price {}: {}",
-        available_funds, proposed_price, result
-    );
+    HttpResponse::Accepted().json(JobResponse { job_id })
 }
 
-fn main() {
-    // Test range check
-    check_range(35, 0, 100);
+async fn get_job_status(job_id: web::Path<String>, state: web::Data<AppState>) -> impl Responder {
+    let job_id = job_id.into_inner();
+    if let Some(status) = state.jobs.lock().await.get(&job_id) {
+        HttpResponse::Ok().json(status)
+    } else {
+        HttpResponse::NotFound().finish()
+    }
+}
 
-    // Test funds check
-    check_sufficient_funds(50, 100);
+#[actix_web::main]
+async fn main() -> std::io::Result<()> {
+    let (tx, mut rx) = mpsc::channel::<(String, ProofWorkerInput)>(32);
+    let jobs = Mutex::new(HashMap::new());
+    let state = web::Data::new(AppState { jobs, tx });
+
+    // Spawn worker
+    let state_clone = state.clone();
+    tokio::spawn(async move {
+        while let Some((job_id, input)) = rx.recv().await {
+            let proof = generate_proof(input).await;
+            state_clone.jobs.lock().await.insert(
+                job_id,
+                JobStatus {
+                    status: "completed".to_string(),
+                    proof: Some(proof),
+                },
+            );
+        }
+    });
+
+    HttpServer::new(move || {
+        App::new()
+            .app_data(state.clone())
+            .route("/check_range", web::post().to(check_range))
+            .route("/job/{job_id}", web::get().to(get_job_status))
+    })
+    .bind(("127.0.0.1", 8080))?
+    .run()
+    .await
 }
