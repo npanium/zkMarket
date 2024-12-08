@@ -1,9 +1,8 @@
-#![no_main]
 use risc0_zkvm::guest::env;
 
-risc0_zkvm::guest::entry!(main);
+// risc0_zkvm::guest::entry!(main);
 
-pub fn main() {
+fn main() {
     let mode: i32 = env::read::<i32>();
 
     match mode {

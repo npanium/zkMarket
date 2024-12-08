@@ -29,9 +29,11 @@ async fn generate_proof(input: ProofWorkerInput) -> ProofResponse {
             // Start-- zkVerify
 
             // Proof
-            let inner_hex = hex::encode(bincode::serialize(&receipt.inner).unwrap());
+            let inner_hex = hex::encode(bincode::serialize(&receipt.inner).unwrap()); //TODO: remove hex::encode() wrap. check example
+
             // Public inputs
-            let journal_hex = hex::encode(bincode::serialize(&receipt.journal).unwrap());
+            let journal_hex = hex::encode(bincode::serialize(&receipt.journal).unwrap()); //TODO: remove hex::encode() wrap. check example
+
             // vk
             let mut image_id_hex = String::new();
             for &value in &RANGE_CHECKER_ID {
@@ -66,6 +68,7 @@ async fn generate_proof(input: ProofWorkerInput) -> ProofResponse {
 
             // Proof
             let inner_hex = hex::encode(bincode::serialize(&receipt.inner).unwrap());
+            println!("Proof done: {}", inner_hex);
             // Public inputs
             let journal_hex = hex::encode(bincode::serialize(&receipt.journal).unwrap());
             // vk
