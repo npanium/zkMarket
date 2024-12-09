@@ -12,9 +12,11 @@ import {
   SelectValue,
 } from "./ui/select";
 import { Input } from "./ui/input";
+import { useToast } from "@/hooks/use-toast";
 
 export function CreateListingForm() {
   const router = useRouter();
+  const { toast } = useToast();
   const [loading, setLoading] = useState(false);
   const [range, setRange] = useState("");
   const [price, setPrice] = useState("");
@@ -31,15 +33,29 @@ export function CreateListingForm() {
     setLoading(true);
 
     try {
-      // Here you would:
-      // 1. Generate ZK proof for price in range
-      // 2. Submit to smart contract
-      // 3. Wait for confirmation
+      const response = await fetch("/api/create-listing", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ price, range, type }),
+      });
 
-      await new Promise((resolve) => setTimeout(resolve, 1000)); // Mock delay
+      if (!response.ok) {
+        throw new Error("Failed to create listing");
+      }
+
+      const data = await response.json();
+      toast({
+        title: "Success!",
+        description: "Listing created successfully",
+      });
+
       router.push("/");
-    } catch (error) {
-      console.error("Error creating listing:", error);
+    } catch (error: any) {
+      toast({
+        title: "Error",
+        description: error.message,
+        variant: "destructive",
+      });
     } finally {
       setLoading(false);
     }
