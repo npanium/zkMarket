@@ -32,7 +32,7 @@ NEXT_PUBLIC_RISC0_SERVER=http://localhost:8080
 npm run dev
 
 # Start RISC0 prover server (required)
-cargo run # In the Rust project directory
+cargo run --release # In the Rust project directory
 ```
 
 ## Project Structure
