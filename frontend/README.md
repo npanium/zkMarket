@@ -1,36 +1,85 @@
-This is a [Next.js](https://nextjs.org/) project bootstrapped with [`create-next-app`](https://github.com/vercel/next.js/tree/canary/packages/create-next-app).
+# zkMarket
 
-## Getting Started
+A zero-knowledge dark marketplace that lets users trade assets privately while proving price ranges without revealing exact amounts.
 
-First, run the development server:
+## Features
+
+- Private order creation with ZK proofs
+- Range-based price verification
+- Order matching without exposing exact prices
+- Integration with RISC0 for proof generation
+- Proof verification through zkVerify protocol
+
+## Tech Stack
+
+- Next.js 14.0.3 (App Router)
+- TypeScript
+- Rust (RISC0 prover)
+- zkVerify protocol
+- shadcn/ui components
+
+## Setup
 
 ```bash
+# Install dependencies
+npm install
+
+# Add environment variables
+SUBSTRATE_SEED_PHRASE=your_seed_phrase
+NEXT_PUBLIC_RISC0_SERVER=http://localhost:8080
+
+# Run development server
 npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
+
+# Start RISC0 prover server (required)
+cargo run # In the Rust project directory
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+## Project Structure
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+```
+/app
+  /api
+    /create-listing    # Handles order creation & proof submission
+    /test-zkverify    # Test endpoint for zkVerify submission
+  /orders             # View active/past orders
+  /create             # Create new listings
+/components           # UI components
+/utils               # Helper functions
+```
 
-This project uses [`next/font`](https://nextjs.org/docs/basic-features/font-optimization) to automatically optimize and load Inter, a custom Google Font.
+## Current Status
 
-## Learn More
+Implemented:
 
-To learn more about Next.js, take a look at the following resources:
+- Frontend interface
+- Order creation form
+- Price range validation
+- RISC0 proof generation (requires Rust server)
+- zkVerify proof submission
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+## TODO
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js/) - your feedback and contributions are welcome!
+Smart Contracts (Not Yet Connected):
 
-## Deploy on Vercel
+- Asset transfer execution
+- Order matching logic
+- Escrow functionality
+- Settlement mechanism
+- Trade verification
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+The project currently focuses on the frontend interface and ZK proof generation/verification. Smart contracts for actual asset transfers and order matching are created but pending integration due to hackathon time constraints.
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/deployment) for more details.
+## Testing
+
+Test endpoints:
+
+```bash
+# Test create-listing (requires Rust server on port 8080)
+curl -X POST http://localhost:3000/api/create-listing \
+-H "Content-Type: application/json" \
+-d '{"price":"300","range":"LOW","type":"SELL"}'
+
+# Test zkVerify submission
+curl -X POST http://localhost:3000/api/test-zkverify
+```
