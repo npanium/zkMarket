@@ -53,12 +53,14 @@ cargo run # In the Rust project directory
 Implemented:
 
 - Frontend interface
-- Order creation form
+- Order creation form with selling implemented
 - Price range validation
 - RISC0 proof generation (requires Rust server)
 - zkVerify proof submission
 
 ## TODO
+
+Wallet integration
 
 Smart Contracts (Not Yet Connected):
 

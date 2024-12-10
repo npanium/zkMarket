@@ -6,7 +6,7 @@ export function Navbar() {
     <nav className="border-b">
       <div className="container mx-auto px-4 py-3 flex justify-between items-center">
         <Link href="/" className="font-bold text-xl">
-          DM
+          zkM
         </Link>
         <div className="flex gap-4">
           <Link href="/create">
