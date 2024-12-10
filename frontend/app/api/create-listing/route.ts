@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { zkVerifySession } from "zkverifyjs";
 
 export async function POST(req: Request) {
+  let session;
   try {
     const { price, range, type } = await req.json();
 
@@ -26,30 +27,34 @@ export async function POST(req: Request) {
 
     console.log(`response from Rust: \n ${JSON.stringify(proof)}`);
     // 3. Submit to zkVerify
-    // const session = await zkVerifySession
-    //   .start()
-    //   .Testnet()
-    //   .withAccount(process.env.SUBSTRATE_SEED_PHRASE!);
+    session = await zkVerifySession
+      .start()
+      .Testnet()
+      .withAccount(process.env.SUBSTRATE_SEED_PHRASE!);
 
-    // const { events, transactionResult } = await session
-    //   .verify()
-    //   .risc0()
-    //   .execute({
-    //     proofData: {
-    //       proof: proof.inner_hex, // From RISC0 response
-    //       publicSignals: proof.journal_hex, // From RISC0 response
-    //       vk: proof.image_id_hex, // From RISC0 response
-    //     },
-    //   });
+    const { events, transactionResult } = await session
+      .verify()
+      .risc0()
+      .execute({
+        proofData: {
+          proof: proof.inner_hex, // From RISC0 response
+          publicSignals: proof.journal_hex, // From RISC0 response
+          vk: proof.image_id_hex, // From RISC0 response
+        },
+      });
 
-    // const result = await transactionResult;
+    const result = await transactionResult;
 
     return NextResponse.json({
       success: true,
-      transactionInfo: proof.image_id_hex,
+      transactionInfo: result,
     });
   } catch (error: any) {
     return NextResponse.json({ error: error.message }, { status: 500 });
+  } finally {
+    if (session) {
+      await session.close();
+    }
   }
 }
 
